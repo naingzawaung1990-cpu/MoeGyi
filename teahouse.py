@@ -333,9 +333,9 @@ if 'product_id' in query_params:
         st.divider()
         
         st.markdown(f"## {product['name']}")
-        st.markdown(f"### 💰 ₹{display_price}")
+        st.markdown(f"### 💰 {display_price}")
         if has_qr_price:
-            st.caption(f"💡 QR Code ဈေးနှုန်း (မူလဈေးနှုန်း: ₹{product['price']})")
+            st.caption(f"💡 QR Code ဈေးနှုန်း (မူလဈေးနှုန်း: {product['price']})")
         st.divider()
         
         if is_admin_access:
@@ -480,49 +480,20 @@ else:
     for category in categories:
         items_in_category = category_items[category]
         if items_in_category:
-            # Category Header with Image
+            # Category Header
             category_name = get_category_name(category)
+            st.markdown(f'<div class="menu-category-header">{category_name}</div>', unsafe_allow_html=True)
             
-            # For JUICE category, image on left; for others, image on right
+            # For JUICE: image on left, items on right
+            # For TEA/SNACK: items on left, image on right
             if category == "juice":
-                col_img, col_header = st.columns([1, 3])
-                
-                with col_img:
-                    # Display category image on left for JUICE
-                    cat_img_url = st.session_state.category_images.get(category, "")
-                    if cat_img_url:
-                        try:
-                            st.image(cat_img_url, use_container_width=True, caption="")
-                        except:
-                            st.write("")
-                    else:
-                        st.write("")
-                
-                with col_header:
-                    st.markdown(f'<div class="menu-category-header">{category_name}</div>', unsafe_allow_html=True)
+                col_img, col_items = st.columns([1, 2])
             else:
-                col_header, col_img = st.columns([3, 1])
-                
-                with col_header:
-                    st.markdown(f'<div class="menu-category-header">{category_name}</div>', unsafe_allow_html=True)
-                
-                with col_img:
-                    # Display category image on right for TEA and SNACK
-                    cat_img_url = st.session_state.category_images.get(category, "")
-                    if cat_img_url:
-                        try:
-                            st.image(cat_img_url, use_container_width=True, caption="")
-                        except:
-                            st.write("")
-                    else:
-                        st.write("")
+                col_items, col_img = st.columns([2, 1])
             
-            # Display items in two columns (like tea house menu)
-            items_per_column = (len(items_in_category) + 1) // 2
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                for item in items_in_category[:items_per_column]:
+            with col_items:
+                # Display items list
+                for item in items_in_category:
                     item_id = item['id']
                     is_editing = st.session_state.editing_id == item_id
                     
@@ -557,8 +528,8 @@ else:
                                         buf.seek(0)
                                         
                                         st.success("✅ QR Code အောင်မြင်စွာ ထုတ်လုပ်ပြီးပါပြီ။")
-                                        st.info(f"📱 QR Code ကို scan လုပ်လျှင် product page သို့ ရောက်ရှိမည်။\n💡 QR Code ဈေးနှုန်း: ₹{qr_price}")
-                                        st.image(qr_img, caption=f"{qr_name} - ₹{qr_price}", use_container_width=True)
+                                        st.info(f"📱 QR Code ကို scan လုပ်လျှင် product page သို့ ရောက်ရှိမည်။\n💡 QR Code ဈေးနှုန်း: {qr_price}")
+                                        st.image(qr_img, caption=f"{qr_name} - {qr_price}", use_container_width=True)
                                         
                                         with st.expander("🔗 Product Page URL (Reference)"):
                                             st.markdown("**Customer URL (QR Code):**")
@@ -618,11 +589,11 @@ else:
                                     st.rerun()
                     
                     else:
-                        # Display Mode (Menu Format)
+                        # Display Mode (Menu Format) - Remove ₹ symbol
                         st.markdown(
                             f'<div class="menu-item-row">'
                             f'<span class="menu-item-name">{item["name"]}</span>'
-                            f'<span class="menu-item-price">₹{item["price"]}</span>'
+                            f'<span class="menu-item-price">{item["price"]}</span>'
                             f'</div>',
                             unsafe_allow_html=True
                         )
@@ -643,127 +614,16 @@ else:
                                     st.session_state.qr_generating_id = item_id
                                     st.rerun()
             
-            with col2:
-                for item in items_in_category[items_per_column:]:
-                    item_id = item['id']
-                    is_editing = st.session_state.editing_id == item_id
-                    
-                    if st.session_state.qr_generating_id == item_id:
-                        with st.container(border=True):
-                            st.subheader("📱 QR Code ထုတ်လုပ်နေသည်")
-                            with st.form(f"qr_form_{item_id}", clear_on_submit=False):
-                                qr_name = st.text_input("ပစ္စည်းအမည်", value=item['name'], key=f"qr_name_{item_id}")
-                                qr_price = st.text_input("ဈေးနှုန်း (ပြင်ဆင်နိုင်သည်)", value=item['price'], key=f"qr_price_{item_id}")
-                                
-                                col_generate, col_cancel_qr = st.columns(2)
-                                with col_generate:
-                                    generate_btn = st.form_submit_button("📱 QR Code ထုတ်မည်", use_container_width=True, type="primary")
-                                with col_cancel_qr:
-                                    cancel_qr_btn = st.form_submit_button("❌ ပယ်ဖျက်မည်", use_container_width=True)
-                                
-                                if generate_btn:
-                                    if qr_name.strip() and validate_price(qr_price):
-                                        st.session_state.qr_prices[item_id] = qr_price.strip()
-                                        _save_data()
-                                        
-                                        product_url = f"?product_id={item_id}"
-                                        if st.session_state.qr_base_url:
-                                            base_url = st.session_state.qr_base_url.rstrip('/')
-                                            full_url = f"{base_url}{product_url}"
-                                        else:
-                                            full_url = product_url
-                                        
-                                        qr_img = generate_qr_code(full_url)
-                                        buf = BytesIO()
-                                        qr_img.save(buf, format='PNG')
-                                        buf.seek(0)
-                                        
-                                        st.success("✅ QR Code အောင်မြင်စွာ ထုတ်လုပ်ပြီးပါပြီ။")
-                                        st.info(f"📱 QR Code ကို scan လုပ်လျှင် product page သို့ ရောက်ရှိမည်။\n💡 QR Code ဈေးနှုန်း: ₹{qr_price}")
-                                        st.image(qr_img, caption=f"{qr_name} - ₹{qr_price}", use_container_width=True)
-                                        
-                                        with st.expander("🔗 Product Page URL (Reference)"):
-                                            st.markdown("**Customer URL (QR Code):**")
-                                            st.code(full_url, language=None)
-                                        
-                                        st.download_button(
-                                            label="⬇️ QR Code ဒေါင်းလုဒ်လုပ်မည်",
-                                            data=buf,
-                                            file_name=f"QR_{qr_name.replace(' ', '_')}.png",
-                                            mime="image/png",
-                                            use_container_width=True
-                                        )
-                                        st.session_state.qr_generating_id = None
-                                    else:
-                                        st.error("⚠️ အချက်အလက်များ ပြည့်စုံစွာ ဖြည့်သွင်းပါ။")
-                                
-                                if cancel_qr_btn:
-                                    st.session_state.qr_generating_id = None
-                                    st.rerun()
-                    
-                    elif is_editing and st.session_state.is_admin:
-                        with st.container(border=True):
-                            st.subheader("✏️ ပြင်ဆင်နေသည်")
-                            with st.form(f"edit_form_{item_id}", clear_on_submit=False):
-                                new_name = st.text_input("ပစ္စည်းအမည်", value=item['name'], key=f"edit_name_{item_id}")
-                                new_price = st.text_input("ဈေးနှုန်း", value=item['price'], key=f"edit_price_{item_id}")
-                                new_category = st.selectbox("အမျိုးအစား", ["tea", "juice", "snack"],
-                                                           index=["tea", "juice", "snack"].index(item.get('category', 'tea')),
-                                                           format_func=get_category_name,
-                                                           key=f"edit_category_{item_id}")
-                                
-                                col_save, col_cancel = st.columns(2)
-                                with col_save:
-                                    save_btn = st.form_submit_button("💾 သိမ်းဆည်းမည်", use_container_width=True)
-                                with col_cancel:
-                                    cancel_btn = st.form_submit_button("❌ ပယ်ဖျက်မည်", use_container_width=True)
-                                
-                                if save_btn:
-                                    if new_name.strip() and validate_price(new_price):
-                                        for i, store_item in enumerate(st.session_state.store_items):
-                                            if store_item['id'] == item_id:
-                                                st.session_state.store_items[i] = {
-                                                    "id": item_id,
-                                                    "name": new_name.strip(),
-                                                    "price": new_price.strip(),
-                                                    "category": new_category
-                                                }
-                                                break
-                                        _save_data()
-                                        st.session_state.editing_id = None
-                                        st.rerun()
-                                    else:
-                                        st.error("⚠️ အချက်အလက်များ ပြည့်စုံစွာ ဖြည့်သွင်းပါ။")
-                                
-                                if cancel_btn:
-                                    st.session_state.editing_id = None
-                                    st.rerun()
-                    
-                    else:
-                        # Display Mode (Menu Format)
-                        st.markdown(
-                            f'<div class="menu-item-row">'
-                            f'<span class="menu-item-name">{item["name"]}</span>'
-                            f'<span class="menu-item-price">₹{item["price"]}</span>'
-                            f'</div>',
-                            unsafe_allow_html=True
-                        )
-                        
-                        # Admin actions (below the item)
-                        if st.session_state.is_admin:
-                            col_edit, col_del, col_qr = st.columns(3)
-                            with col_edit:
-                                if st.button("✏️", key=f"edit_{item_id}_2", use_container_width=True):
-                                    st.session_state.editing_id = item_id
-                                    st.rerun()
-                            with col_del:
-                                if st.button("🗑️", key=f"del_{item_id}_2", use_container_width=True):
-                                    st.session_state.delete_confirm_id = item_id
-                                    st.rerun()
-                            with col_qr:
-                                if st.button("📱", key=f"qr_{item_id}_2", use_container_width=True):
-                                    st.session_state.qr_generating_id = item_id
-                                    st.rerun()
+            with col_img:
+                # Display category image
+                cat_img_url = st.session_state.category_images.get(category, "")
+                if cat_img_url:
+                    try:
+                        st.image(cat_img_url, use_container_width=True, caption="")
+                    except:
+                        st.write("")
+                else:
+                    st.write("")
             
             st.divider()
 
