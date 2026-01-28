@@ -12,6 +12,15 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# -------- Auth / Mode --------
+# Default = Customer view. Admin wants to edit => click Admin => enter key (12345)
+if "is_admin" not in st.session_state:
+    st.session_state.is_admin = False
+if "show_admin_login" not in st.session_state:
+    st.session_state.show_admin_login = False
+
+ADMIN_KEY = "12345"
+
 # အချက်အလက်များ သိမ်းဆည်းရန် (Database အစား session_state သုံးထားသည်)
 if 'store_items' not in st.session_state:
     st.session_state.store_items = [
@@ -33,10 +42,6 @@ if 'store_items' not in st.session_state:
 if 'editing_id' not in st.session_state:
     st.session_state.editing_id = None
 
-# View mode (Admin/Customer)
-if 'view_mode' not in st.session_state:
-    st.session_state.view_mode = 'admin'  # 'admin' or 'customer'
-
 # QR code generation tracking
 if 'qr_generating_id' not in st.session_state:
     st.session_state.qr_generating_id = None
@@ -52,10 +57,6 @@ if 'qr_prices' not in st.session_state:
 # Base URL for QR codes (for production deployment)
 if 'qr_base_url' not in st.session_state:
     st.session_state.qr_base_url = ""  # Leave empty for relative URLs, or set full domain
-
-# Admin secret key for product page access
-if 'admin_secret_key' not in st.session_state:
-    st.session_state.admin_secret_key = "admin123"  # Change this to your secret key
 
 # Helper Functions
 def validate_price(price_str):
@@ -77,28 +78,50 @@ def generate_qr_code(data):
     img = qr.make_image(fill_color="black", back_color="white")
     return img
 
-# --- Sidebar: View Mode Toggle ---
-# Only show sidebar if not on product page (QR code page)
+# --- Sidebar / Header controls ---
+# Only show sidebar controls if not on product page (QR code page)
 query_params = st.query_params
 is_product_page = 'product_id' in query_params
 
 if not is_product_page:
     st.sidebar.header("⚙️ စနစ်ထိန်းချုပ်မှု")
-    
-    # View Mode Selection
-    view_mode = st.sidebar.radio(
-        "မြင်ကွင်းရွေးချယ်ရန်",
-        ["👨‍💼 Admin Mode", "👤 Customer Mode"],
-        index=0 if st.session_state.view_mode == 'admin' else 1,
-        key="view_mode_selector"
-    )
-    
-    st.session_state.view_mode = 'admin' if view_mode == "👨‍💼 Admin Mode" else 'customer'
-    
-    st.sidebar.divider()
+
+    colA, colB = st.sidebar.columns(2)
+    with colA:
+        if st.button("👤 Customer", use_container_width=True):
+            st.session_state.is_admin = False
+            st.session_state.show_admin_login = False
+            st.rerun()
+    with colB:
+        if st.button("👨‍💼 Admin", use_container_width=True, type="primary"):
+            st.session_state.show_admin_login = True
+            st.rerun()
+
+    # Admin login prompt
+    if st.session_state.show_admin_login and not st.session_state.is_admin:
+        st.sidebar.divider()
+        st.sidebar.subheader("🔐 Admin Key ထည့်ပါ")
+        key_input = st.sidebar.text_input("Key", type="password")
+        if st.sidebar.button("Login", use_container_width=True):
+            if (key_input or "").strip() == ADMIN_KEY:
+                st.session_state.is_admin = True
+                st.session_state.show_admin_login = False
+                st.sidebar.success("✅ Admin Mode ဖွင့်ပြီးပါပြီ။")
+                st.rerun()
+            else:
+                st.sidebar.error("❌ Key မှားနေပါတယ်။")
+
+    if st.session_state.is_admin:
+        st.sidebar.success("👨‍💼 Admin Mode")
+        if st.sidebar.button("Logout", use_container_width=True):
+            st.session_state.is_admin = False
+            st.session_state.show_admin_login = False
+            st.session_state.editing_id = None
+            st.session_state.qr_generating_id = None
+            st.rerun()
 
 # Admin Mode Features (Only show in Admin Mode and not on product page)
-if st.session_state.view_mode == 'admin' and not is_product_page:
+if st.session_state.is_admin and not is_product_page:
     st.sidebar.header("📦 ပစ္စည်းစီမံခန့်ခွဲမှု")
     
     # Search/Filter
@@ -141,23 +164,6 @@ if st.session_state.view_mode == 'admin' and not is_product_page:
     )
     st.session_state.qr_base_url = qr_base_url.strip()
     
-    # Admin Secret Key Configuration
-    st.sidebar.divider()
-    st.sidebar.subheader("🔐 Admin Access Setting")
-    admin_secret = st.sidebar.text_input(
-        "Admin Secret Key",
-        value=st.session_state.admin_secret_key,
-        type="password",
-        help="Product page တွင် admin access ရရှိရန် secret key ဖြစ်ပါသည်။"
-    )
-    st.session_state.admin_secret_key = admin_secret.strip() if admin_secret.strip() else "admin123"
-    
-    # Show admin access URL example
-    with st.sidebar.expander("ℹ️ Admin Access URL"):
-        st.caption("Product page တွင် admin access ရရှိရန်:")
-        st.code(f"?product_id=xxx&admin={st.session_state.admin_secret_key}", language=None)
-        st.caption("ဤ URL ကို browser address bar တွင် ထည့်သွင်းပါ။")
-    
     # Statistics
     st.sidebar.divider()
     st.sidebar.metric("📊 စုစုပေါင်း ပစ္စည်းများ", len(st.session_state.store_items))
@@ -177,35 +183,25 @@ if 'product_id' in query_params:
     product = next((item for item in st.session_state.store_items if item['id'] == product_id), None)
     
     if product:
-        # Check if admin access is requested via secret key
-        admin_key = query_params.get('admin', '')
-        is_admin_access = admin_key == st.session_state.admin_secret_key
-        
-        # Set view mode based on admin access
-        if is_admin_access:
-            st.session_state.view_mode = 'admin'
-        else:
-            st.session_state.view_mode = 'customer'
+        # Product page is customer view by default. Admin can click Admin and enter key to edit.
+        is_admin_access = bool(st.session_state.is_admin)
         
         # Get QR price if exists, otherwise use main price
         display_price = st.session_state.qr_prices.get(product_id, product['price'])
         has_qr_price = product_id in st.session_state.qr_prices
         
-        # Hide sidebar for customer view only
+        # Hide sidebar + header for customer view only
         if not is_admin_access:
-            st.markdown("""
-            <style>
-                [data-testid="stSidebar"] {
-                    display: none !important;
-                }
-                [data-testid="stHeader"] {
-                    display: none !important;
-                }
-                .stDeployButton {
-                    display: none !important;
-                }
-            </style>
-            """, unsafe_allow_html=True)
+            st.markdown(
+                """
+                <style>
+                  [data-testid="stSidebar"] { display: none !important; }
+                  [data-testid="stHeader"] { display: none !important; }
+                  .stDeployButton { display: none !important; }
+                </style>
+                """,
+                unsafe_allow_html=True,
+            )
         
         # Product Page Display
         st.title(f"📦 {product['name']}")
@@ -230,6 +226,17 @@ if 'product_id' in query_params:
             else:
                 st.success("📱 QR Code ဖြင့် ရောက်ရှိလာသော ပစ္စည်းဖြစ်ပါသည်။")
                 st.info("🏪 ဆိုင်သို့ လာရောက်ဝယ်ယူနိုင်ပါသည်။")
+                # Customer page "Admin" button (prompts key via sidebar if not product page;
+                # here we show an inline login prompt)
+                with st.expander("👨‍💼 Admin (Edit)"):
+                    key_inline = st.text_input("Admin Key", type="password", key=f"inline_admin_key_{product_id}")
+                    if st.button("Login as Admin", key=f"inline_admin_login_{product_id}", type="primary"):
+                        if (key_inline or "").strip() == ADMIN_KEY:
+                            st.session_state.is_admin = True
+                            st.success("✅ Admin Mode ဖွင့်ပြီးပါပြီ။")
+                            st.rerun()
+                        else:
+                            st.error("❌ Key မှားနေပါတယ်။")
         
         # Admin Edit Section (only if admin access)
         if is_admin_access:
@@ -274,18 +281,13 @@ if 'product_id' in query_params:
         # Back button
         if st.button("← နောက်သို့ ပြန်သွားမည်"):
             st.query_params.clear()
-            st.session_state.view_mode = 'customer'
             st.rerun()
         
         st.stop()  # Stop here, don't show main interface
 
 # --- Main Interface ---
-if st.session_state.view_mode == 'admin':
-    st.title("🏪 Store Inventory Management")
-    st.write("လက်ရှိဆိုင်ထဲရှိ ပစ္စည်းများစာရင်း")
-else:
-    st.title("🏪 ကျွန်ုပ်တို့၏ ဆိုင်")
-    st.write("လက်ရှိဆိုင်ထဲရှိ ပစ္စည်းများစာရင်း")
+st.title("🏪 ကျွန်ုပ်တို့၏ ဆိုင်" if not st.session_state.is_admin else "🏪 Store Inventory Management")
+st.write("လက်ရှိဆိုင်ထဲရှိ ပစ္စည်းများစာရင်း")
 
 # Filter items based on search
 filtered_items = st.session_state.store_items
@@ -437,7 +439,7 @@ else:
                         st.markdown(f"**📦 {item['name']}**")
                         
                         # Admin Mode Buttons (Edit, Delete, QR Code)
-                        if st.session_state.view_mode == 'admin':
+                        if st.session_state.is_admin:
                             col1, col2, col3 = st.columns(3)
                             with col1:
                                 if st.button("✏️ Edit", key=f"edit_{item_id}", use_container_width=True):
