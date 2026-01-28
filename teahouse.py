@@ -473,6 +473,58 @@ else:
         font-weight: bold;
         margin-left: 20px;
     }
+    /* Custom flexbox container for category layout */
+    .category-layout {
+        display: block !important;
+        width: 100% !important;
+        margin: 10px 0 !important;
+    }
+    /* Force columns to stay side-by-side on all screen sizes including mobile */
+    .category-layout [data-testid="column-container"] {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        width: 100% !important;
+        gap: 10px !important;
+    }
+    .category-layout [data-testid="column"] {
+        display: flex !important;
+        flex-direction: column !important;
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        overflow: hidden !important;
+    }
+    /* Mobile-specific rules */
+    @media screen and (max-width: 768px) {
+        .category-layout [data-testid="column-container"] {
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+            gap: 8px !important;
+        }
+        .category-layout [data-testid="column"] {
+            flex: 1 1 auto !important;
+            min-width: 0 !important;
+            max-width: 50% !important;
+            padding: 0 4px !important;
+        }
+    }
+    /* Extra small mobile */
+    @media screen and (max-width: 480px) {
+        .category-layout [data-testid="column-container"] {
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+            gap: 5px !important;
+        }
+        .category-layout [data-testid="column"] {
+            flex: 1 1 auto !important;
+            min-width: 0 !important;
+            max-width: 50% !important;
+            padding: 0 3px !important;
+        }
+    }
     </style>
     """, unsafe_allow_html=True)
     
@@ -484,11 +536,14 @@ else:
             category_name = get_category_name(category)
             st.markdown(f'<div class="menu-category-header">{category_name}</div>', unsafe_allow_html=True)
             
+            # Use Streamlit columns with CSS wrapper for mobile compatibility
             # For JUICE: image on left, items on right
             # For TEA/SNACK: items on left, image on right
             if category == "juice":
+                st.markdown('<div class="category-layout">', unsafe_allow_html=True)
                 col_img, col_items = st.columns([1, 2])
             else:
+                st.markdown('<div class="category-layout">', unsafe_allow_html=True)
                 col_items, col_img = st.columns([2, 1])
             
             with col_items:
@@ -624,6 +679,9 @@ else:
                         st.write("")
                 else:
                     st.write("")
+            
+            # Close layout container
+            st.markdown('</div>', unsafe_allow_html=True)
             
             st.divider()
 
