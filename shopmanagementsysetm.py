@@ -53,6 +53,10 @@ if 'qr_prices' not in st.session_state:
 if 'qr_base_url' not in st.session_state:
     st.session_state.qr_base_url = ""  # Leave empty for relative URLs, or set full domain
 
+# Admin secret key for product page access
+if 'admin_secret_key' not in st.session_state:
+    st.session_state.admin_secret_key = "admin123"  # Change this to your secret key
+
 # Helper Functions
 def validate_price(price_str):
     """ဈေးနှုန်းကို စစ်ဆေးရန်"""
@@ -74,22 +78,27 @@ def generate_qr_code(data):
     return img
 
 # --- Sidebar: View Mode Toggle ---
-st.sidebar.header("⚙️ စနစ်ထိန်းချုပ်မှု")
+# Only show sidebar if not on product page (QR code page)
+query_params = st.query_params
+is_product_page = 'product_id' in query_params
 
-# View Mode Selection
-view_mode = st.sidebar.radio(
-    "မြင်ကွင်းရွေးချယ်ရန်",
-    ["👨‍💼 Admin Mode", "👤 Customer Mode"],
-    index=0 if st.session_state.view_mode == 'admin' else 1,
-    key="view_mode_selector"
-)
+if not is_product_page:
+    st.sidebar.header("⚙️ စနစ်ထိန်းချုပ်မှု")
+    
+    # View Mode Selection
+    view_mode = st.sidebar.radio(
+        "မြင်ကွင်းရွေးချယ်ရန်",
+        ["👨‍💼 Admin Mode", "👤 Customer Mode"],
+        index=0 if st.session_state.view_mode == 'admin' else 1,
+        key="view_mode_selector"
+    )
+    
+    st.session_state.view_mode = 'admin' if view_mode == "👨‍💼 Admin Mode" else 'customer'
+    
+    st.sidebar.divider()
 
-st.session_state.view_mode = 'admin' if view_mode == "👨‍💼 Admin Mode" else 'customer'
-
-st.sidebar.divider()
-
-# Admin Mode Features (Only show in Admin Mode)
-if st.session_state.view_mode == 'admin':
+# Admin Mode Features (Only show in Admin Mode and not on product page)
+if st.session_state.view_mode == 'admin' and not is_product_page:
     st.sidebar.header("📦 ပစ္စည်းစီမံခန့်ခွဲမှု")
     
     # Search/Filter
@@ -132,37 +141,73 @@ if st.session_state.view_mode == 'admin':
     )
     st.session_state.qr_base_url = qr_base_url.strip()
     
+    # Admin Secret Key Configuration
+    st.sidebar.divider()
+    st.sidebar.subheader("🔐 Admin Access Setting")
+    admin_secret = st.sidebar.text_input(
+        "Admin Secret Key",
+        value=st.session_state.admin_secret_key,
+        type="password",
+        help="Product page တွင် admin access ရရှိရန် secret key ဖြစ်ပါသည်။"
+    )
+    st.session_state.admin_secret_key = admin_secret.strip() if admin_secret.strip() else "admin123"
+    
+    # Show admin access URL example
+    with st.sidebar.expander("ℹ️ Admin Access URL"):
+        st.caption("Product page တွင် admin access ရရှိရန်:")
+        st.code(f"?product_id=xxx&admin={st.session_state.admin_secret_key}", language=None)
+        st.caption("ဤ URL ကို browser address bar တွင် ထည့်သွင်းပါ။")
+    
     # Statistics
     st.sidebar.divider()
     st.sidebar.metric("📊 စုစုပေါင်း ပစ္စည်းများ", len(st.session_state.store_items))
 else:
-    # Customer Mode - Simple Search Only
-    st.sidebar.header("🔍 ရှာဖွေရန်")
-    st.session_state.search_query = st.sidebar.text_input("ပစ္စည်းအမည် ရှာဖွေပါ", value=st.session_state.search_query)
-    st.sidebar.divider()
-    st.sidebar.metric("📊 စုစုပေါင်း ပစ္စည်းများ", len(st.session_state.store_items))
+    # Customer Mode - Simple Search Only (only if not on product page)
+    if not is_product_page:
+        st.sidebar.header("🔍 ရှာဖွေရန်")
+        st.session_state.search_query = st.sidebar.text_input("ပစ္စည်းအမည် ရှာဖွေပါ", value=st.session_state.search_query)
+        st.sidebar.divider()
+        st.sidebar.metric("📊 စုစုပေါင်း ပစ္စည်းများ", len(st.session_state.store_items))
 
 # --- Product Page (for QR Code) ---
 # Check if this is a product page request (from QR code)
-query_params = st.query_params
+# Note: query_params already defined above
 if 'product_id' in query_params:
     product_id = query_params['product_id']
     product = next((item for item in st.session_state.store_items if item['id'] == product_id), None)
     
     if product:
+        # Check if admin access is requested via secret key
+        admin_key = query_params.get('admin', '')
+        is_admin_access = admin_key == st.session_state.admin_secret_key
+        
+        # Set view mode based on admin access
+        if is_admin_access:
+            st.session_state.view_mode = 'admin'
+        else:
+            st.session_state.view_mode = 'customer'
+        
         # Get QR price if exists, otherwise use main price
         display_price = st.session_state.qr_prices.get(product_id, product['price'])
         has_qr_price = product_id in st.session_state.qr_prices
         
-        # Hide sidebar for product page
-        st.markdown("""
-        <style>
-            [data-testid="stSidebar"] {
-                display: none;
-            }
-        </style>
-        """, unsafe_allow_html=True)
+        # Hide sidebar for customer view only
+        if not is_admin_access:
+            st.markdown("""
+            <style>
+                [data-testid="stSidebar"] {
+                    display: none !important;
+                }
+                [data-testid="stHeader"] {
+                    display: none !important;
+                }
+                .stDeployButton {
+                    display: none !important;
+                }
+            </style>
+            """, unsafe_allow_html=True)
         
+        # Product Page Display
         st.title(f"📦 {product['name']}")
         st.divider()
         
@@ -179,12 +224,57 @@ if 'product_id' in query_params:
             if has_qr_price:
                 st.caption(f"💡 QR Code ဈေးနှုန်း (မူလဈေးနှုန်း: {product['price']} KS)")
             st.divider()
-            st.success("📱 QR Code ဖြင့် ရောက်ရှိလာသော ပစ္စည်းဖြစ်ပါသည်။")
-            st.info("🏪 ဆိုင်သို့ လာရောက်ဝယ်ယူနိုင်ပါသည်။")
+            
+            if is_admin_access:
+                st.warning("🔐 Admin Mode - ပြင်ဆင်နိုင်ပါသည်။")
+            else:
+                st.success("📱 QR Code ဖြင့် ရောက်ရှိလာသော ပစ္စည်းဖြစ်ပါသည်။")
+                st.info("🏪 ဆိုင်သို့ လာရောက်ဝယ်ယူနိုင်ပါသည်။")
+        
+        # Admin Edit Section (only if admin access)
+        if is_admin_access:
+            st.divider()
+            st.subheader("✏️ Admin: ပြင်ဆင်ရန်")
+            with st.form(f"admin_edit_{product_id}", clear_on_submit=False):
+                new_name = st.text_input("ပစ္စည်းအမည်", value=product['name'], key=f"admin_name_{product_id}")
+                new_price = st.text_input("ဈေးနှုန်း", value=product['price'], key=f"admin_price_{product_id}")
+                new_qr_price = st.text_input("QR Code ဈေးနှုန်း", value=display_price, key=f"admin_qr_price_{product_id}")
+                new_img = st.text_input("ပုံ Link", value=product['img'], key=f"admin_img_{product_id}")
+                
+                col_save, col_cancel = st.columns(2)
+                with col_save:
+                    save_btn = st.form_submit_button("💾 သိမ်းဆည်းမည်", use_container_width=True, type="primary")
+                with col_cancel:
+                    cancel_btn = st.form_submit_button("❌ ပယ်ဖျက်မည်", use_container_width=True)
+                
+                if save_btn:
+                    if new_name.strip() and validate_price(new_price):
+                        # Update main product
+                        for i, store_item in enumerate(st.session_state.store_items):
+                            if store_item['id'] == product_id:
+                                st.session_state.store_items[i] = {
+                                    "id": product_id,
+                                    "name": new_name.strip(),
+                                    "price": new_price.strip(),
+                                    "img": new_img.strip() if new_img.strip() else "https://via.placeholder.com/300x200?text=No+Image"
+                                }
+                                break
+                        
+                        # Update QR price if different
+                        if validate_price(new_qr_price):
+                            st.session_state.qr_prices[product_id] = new_qr_price.strip()
+                        elif product_id in st.session_state.qr_prices:
+                            del st.session_state.qr_prices[product_id]
+                        
+                        st.success("✅ အောင်မြင်စွာ သိမ်းဆည်းပြီးပါပြီ။")
+                        st.rerun()
+                    else:
+                        st.error("⚠️ အချက်အလက်များ ပြည့်စုံစွာ ဖြည့်သွင်းပါ။")
         
         # Back button
         if st.button("← နောက်သို့ ပြန်သွားမည်"):
             st.query_params.clear()
+            st.session_state.view_mode = 'customer'
             st.rerun()
         
         st.stop()  # Stop here, don't show main interface
@@ -256,6 +346,9 @@ else:
                                         # Use relative URL (works for same domain)
                                         full_url = product_url
                                     
+                                    # Show admin access URL for reference
+                                    admin_url = f"{full_url}&admin={st.session_state.admin_secret_key}"
+                                    
                                     # Generate QR Code with URL
                                     qr_img = generate_qr_code(full_url)
                                     
@@ -270,8 +363,14 @@ else:
                                     
                                     # Show the URL for reference
                                     with st.expander("🔗 Product Page URL (Reference)"):
+                                        st.markdown("**Customer URL (QR Code):**")
                                         st.code(full_url, language=None)
                                         st.caption("ဤ URL ကို QR Code တွင် သိမ်းဆည်းထားပါသည်။")
+                                        
+                                        st.markdown("**Admin Access URL:**")
+                                        st.code(admin_url, language=None)
+                                        st.caption("Admin က product page တွင် ပြင်ဆင်နိုင်ရန် ဤ URL ကို သုံးပါ။")
+                                        
                                         st.warning("⚠️ Production တွင် deploy လုပ်လျှင် full domain URL ကို သုံးရန် လိုအပ်ပါသည်။")
                                     
                                     st.download_button(
