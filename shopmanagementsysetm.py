@@ -375,7 +375,7 @@ if not is_product_page:
     if fresh_qr is not None:
         st.session_state.qr_prices = fresh_qr
 
-st.title("🏪 ကျွန်ုပ်တို့၏ ဆိုင်" if not st.session_state.is_admin else "🏪 Store Inventory Management")
+st.title("🏪 ပွင့်ဖြူ လက်ဖက်ရည်ဆိုင်တွင် ရရှိနိုင်သောအစားအစာများ " if not st.session_state.is_admin else "🏪 Tea House Management System")
 st.write("လက်ရှိဆိုင်ထဲရှိ ပစ္စည်းများစာရင်း")
 
 filtered_items = st.session_state.store_items
@@ -592,4 +592,4 @@ if "delete_confirm_id" in st.session_state:
                 st.rerun()
 
 st.divider()
-st.caption("💻 Developed with Cursor AI & Streamlit | 🏪 Store Inventory Management System")
+st.caption("💻 Developed with Cursor AI & Streamlit | 🏪 Tea House Management System")
