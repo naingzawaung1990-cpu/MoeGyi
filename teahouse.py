@@ -323,19 +323,81 @@ if 'product_id' in query_params:
                   [data-testid="stSidebar"] { display: none !important; }
                   [data-testid="stHeader"] { display: none !important; }
                   .stDeployButton { display: none !important; }
+                  /* Product page layout - force side-by-side on mobile */
+                  .product-page-layout [data-testid="column-container"] {
+                      display: flex !important;
+                      flex-direction: row !important;
+                      flex-wrap: nowrap !important;
+                      width: 100% !important;
+                      gap: 15px !important;
+                  }
+                  .product-page-layout [data-testid="column"] {
+                      display: flex !important;
+                      flex-direction: column !important;
+                      flex: 1 1 auto !important;
+                      min-width: 0 !important;
+                      max-width: 100% !important;
+                  }
+                  @media screen and (max-width: 768px) {
+                      .product-page-layout [data-testid="column-container"] {
+                          display: flex !important;
+                          flex-direction: row !important;
+                          flex-wrap: nowrap !important;
+                          gap: 10px !important;
+                      }
+                      .product-page-layout [data-testid="column"] {
+                          flex: 1 1 auto !important;
+                          min-width: 0 !important;
+                          max-width: 50% !important;
+                          padding: 0 5px !important;
+                      }
+                  }
+                  @media screen and (max-width: 480px) {
+                      .product-page-layout [data-testid="column-container"] {
+                          display: flex !important;
+                          flex-direction: row !important;
+                          flex-wrap: nowrap !important;
+                          gap: 8px !important;
+                      }
+                      .product-page-layout [data-testid="column"] {
+                          flex: 1 1 auto !important;
+                          min-width: 0 !important;
+                          max-width: 50% !important;
+                          padding: 0 4px !important;
+                      }
+                  }
                 </style>
                 """,
                 unsafe_allow_html=True,
             )
         
-        # Product Page Display (No Image)
+        # Product Page Display with Image
         st.title(f"📦 {product['name']}")
         st.divider()
         
-        st.markdown(f"## {product['name']}")
-        st.markdown(f"### 💰 {display_price}")
-        if has_qr_price:
-            st.caption(f"💡 QR Code ဈေးနှုန်း (မူလဈေးနှုန်း: {product['price']})")
+        # Product info and image side-by-side
+        st.markdown('<div class="product-page-layout">', unsafe_allow_html=True)
+        col_info, col_img = st.columns([2, 1])
+        
+        with col_info:
+            st.markdown(f"## {product['name']}")
+            st.markdown(f"### 💰 {display_price}")
+            if has_qr_price:
+                st.caption(f"💡 QR Code ဈေးနှုန်း (မူလဈေးနှုန်း: {product['price']})")
+        
+        with col_img:
+            # Display category image
+            product_category = product.get('category', 'tea')
+            cat_img_url = st.session_state.category_images.get(product_category, "")
+            if cat_img_url:
+                try:
+                    st.image(cat_img_url, use_container_width=True, caption="")
+                except:
+                    st.write("")
+            else:
+                st.write("")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
         st.divider()
         
         if is_admin_access:
