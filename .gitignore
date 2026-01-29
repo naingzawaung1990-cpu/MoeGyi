@@ -1,0 +1,12 @@
+# Credentials - DO NOT COMMIT
+credentials.json
+*.json
+
+# Python
+__pycache__/
+*.py[cod]
+.env
+
+# IDE
+.vscode/
+.idea/
