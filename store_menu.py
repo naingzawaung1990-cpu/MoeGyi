@@ -10,7 +10,7 @@ STORE_NAME = SCRIPT_NAME.replace("_", " ").title()
 
 # Page အပြင်အဆင်
 st.set_page_config(
-    page_title=f"{STORE_NAME} - Menu",
+    page_title=f"{STORE_NAME} - ပွင့်ဖြူ လက်ဖက်ရည်ဆိုင်",
     page_icon="🏪",
     layout="wide",
     initial_sidebar_state="expanded"
